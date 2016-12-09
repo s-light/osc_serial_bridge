@@ -4,7 +4,7 @@
         simple serial to dmx bridge
 
         serial format
-            dmxb [1byte size] [channels each 1byte]
+            dmxSS/_____ [2byte size] [channels each 1byte]
 
 
     hardware
@@ -265,8 +265,36 @@ void DMX_init(Print &out) {
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // serial DMX receiveing
 
+
+void handle_dmxascii(char *command){
+    // command = 'dmx/512:255'
+    // Serial.print(F("\t received dmx data: "));
+
+    // find '/'
+    // char *pointer_nextsection = strtok(&command[0], '/');
+    char *pointer_nextsection = strchr(&command[0], '/') + 1;
+
+    // convert part of string to int
+    // (up to first char that is not a number)
+    uint16_t channel = atoi(pointer_nextsection)+1;
+
+    // find value after ':'
+    // pointer_nextsection = strtok(NULL, ':');
+    pointer_nextsection = strchr(pointer_nextsection, ':') + 1;
+
+    // extract value
+    uint8_t value = atoi(pointer_nextsection);
+
+    // Serial.print(channel);
+    // Serial.print(F(" : "));
+    // Serial.print(value);
+    // Serial.println();
+
+    DMXSerial.write(channel, value);
+}
+
 void handle_dmxbinary(char *command){
-    // command = 'dmxSS/_____'
+    // command = 'DmxSS/_____'
     // SS = 2byte, size
     uint16_t data_size = 0;
     data_size = command[3];
@@ -278,8 +306,14 @@ void handle_dmxbinary(char *command){
         char *data_start_pointer = &command[5];
         // data_start_pointer points to the start of the array.
         uint8_t * raw_buffer = DMXSerial.getBuffer();
+        slight_DebugMenu::print_uint8_array(
+            Serial,
+            data_start_pointer,
+            data_size
+        );
     }
 }
+
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Menu System
@@ -308,8 +342,8 @@ void handleMenu_Main(slight_DebugMenu *pInstance) {
             out.println();
             out.println(F("\t 'A': Show 'HelloWorld' "));
             out.println(F("\t 'f': DemoFadeTo(ID, value) 'f1:65535'"));
-            // out.println(F("\t 'd': dmxb channels 'dmx/255/255'"));
-            out.println(F("\t 'd': dmxb channels B=byte 'dmxSS/[BBB...]'"));
+            out.println(F("\t 'd': dmx channels 'dmx/512:255'"));
+            out.println(F("\t 'D': Dmx channels B=byte 'DmxSS/[BBB...]'"));
             out.println();
             out.println(F("____________________________________________________________"));
         } break;
@@ -373,6 +407,9 @@ void handleMenu_Main(slight_DebugMenu *pInstance) {
             out.println(F("\t demo for parsing values --> finished."));
         } break;
         case 'd': {
+            handle_dmxascii(&command[0]);
+        } break;
+        case 'D': {
             handle_dmxbinary(&command[0]);
         } break;
         //---------------------------------------------------------------------

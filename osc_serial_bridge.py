@@ -172,9 +172,10 @@ class SerialHandler(threading.Thread):
     def send(self, message):
         """Send serial message."""
         if self.ser.is_open:
-            sio.write(unicode(message))
+            # print("send: " + message)
+            self.sio.write(message)
             # this it is buffering. required to get the data out *now*
-            sio.flush()
+            self.sio.flush()
 
     def run(self):
         """handle incomming and outgoing serial treffic."""
@@ -266,10 +267,11 @@ class OSC2Serial(threading.Thread):
         self.tx_queue = tx_queue
 
         self.channel_count = 512
+        # self.channel_count_bytes = struct.pack("H", self.channel_count)
 
         # prepare temp array
-        data_output = array.array('B')
-        data_output *= self.channel_count
+        # self.data = array.array('B')
+        # self.data *= self.channel_count
 
         self.dispatcher = dispatcher.Dispatcher()
 
@@ -290,8 +292,44 @@ class OSC2Serial(threading.Thread):
         """Handle osc messages."""
         # check for new content
         if osc_message:
-            print("{}: {}".format(osc_addr, osc_message))
-            # self.tx_queue.put(serial_message)
+            # print("{}: {}".format(osc_addr, osc_message))
+            # extract data
+            channel_id = int(osc_addr[osc_addr.rfind('/')+1:])
+            # convert from 0..1 to 0..255
+            channel_value = int(255 * osc_message)
+
+            # print(
+            #     "channel_id: {}; "
+            #     "channel_value: {};"
+            #     "".format(
+            #         channel_id,
+            #         channel_value
+            #     )
+            # )
+
+            # self.data[channel_id] = channel_value
+
+            serial_message = "dmx/{:d}:{:d}\n".format(channel_id, channel_value)
+            # print(serial_message)
+            self.tx_queue.put(
+                serial_message
+            )
+
+            # self.tx_queue.put(
+            #     self.create_serial_dmx_message()
+            # )
+
+    # def create_serial_dmx_message(self):
+    #     """Format dmx data as serial message."""
+    #     # format: dmxSS/_____
+    #     # SS = 2byte size
+    #     # ____ channels each 1Byte
+    #     return (
+    #         "dmx" +
+    #         struct.pack("H", len(self.data)) +
+    #         "/" +
+    #         self.data.tostring()
+    #     )
 
     def run(self):
         """Run osc server."""

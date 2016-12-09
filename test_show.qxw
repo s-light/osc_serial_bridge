@@ -66,19 +66,29 @@
    <EndColor>4283825920</EndColor>
    <FixtureGroup>0</FixtureGroup>
    <Property Name="presetSize" Value="10"/>
-   <Property Name="taillength" Value="50"/>
-   <Property Name="tailfade" Value="Yes"/>
    <Property Name="orientation" Value=""/>
    <Property Name="direction" Value=""/>
+   <Property Name="taillength" Value="50"/>
    <Property Name="presetIndex" Value=""/>
+   <Property Name="tailfade" Value="Yes"/>
   </Function>
+  <Function ID="4" Type="Scene" Name="single channel">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="0">0,255</FixtureVal>
+  </Function>
+  <Monitor DisplayMode="0" ShowLabels="0">
+   <Font>Arial,12,-1,5,50,0,0,0,0,0</Font>
+   <ChannelStyle>0</ChannelStyle>
+   <ValueStyle>0</ValueStyle>
+   <Grid Width="5" Height="5" Units="0"/>
+  </Monitor>
  </Engine>
  <VirtualConsole>
   <Frame Caption="">
    <Appearance>
     <FrameStyle>None</FrameStyle>
     <ForegroundColor>Default</ForegroundColor>
-    <BackgroundColor>Default</BackgroundColor>
+    <BackgroundColor>4293257192</BackgroundColor>
     <BackgroundImage>None</BackgroundImage>
     <Font>Default</Font>
    </Appearance>
@@ -90,7 +100,7 @@
      <BackgroundImage>None</BackgroundImage>
      <Font>Default</Font>
     </Appearance>
-    <WindowState Visible="True" X="5" Y="5" Width="95" Height="415"/>
+    <WindowState Visible="True" X="0" Y="0" Width="95" Height="390"/>
     <AllowChildren>True</AllowChildren>
     <AllowResize>True</AllowResize>
     <ShowHeader>False</ShowHeader>
@@ -98,7 +108,7 @@
     <Collapsed>False</Collapsed>
     <Disabled>False</Disabled>
     <Slider Caption="Submaster" ID="2" WidgetStyle="Slider" InvertedAppearance="false">
-     <WindowState Visible="True" X="10" Y="205" Width="75" Height="200"/>
+     <WindowState Visible="True" X="10" Y="205" Width="75" Height="140"/>
      <Appearance>
       <FrameStyle>Sunken</FrameStyle>
       <ForegroundColor>Default</ForegroundColor>
@@ -107,7 +117,7 @@
       <Font>Default</Font>
      </Appearance>
      <SliderMode ValueDisplayStyle="Exact" ClickAndGoType="None">Submaster</SliderMode>
-     <Level LowLimit="0" HighLimit="255" Value="255"/>
+     <Level LowLimit="0" HighLimit="255" Value="0"/>
      <Playback>
       <Function>4294967295</Function>
      </Playback>
@@ -179,80 +189,8 @@
      </Appearance>
     </Label>
    </Frame>
-   <Slider Caption="Red" ID="9" WidgetStyle="Slider" InvertedAppearance="false">
-    <WindowState Visible="True" X="165" Y="215" Width="60" Height="200"/>
-    <Appearance>
-     <FrameStyle>Sunken</FrameStyle>
-     <ForegroundColor>Default</ForegroundColor>
-     <BackgroundColor>Default</BackgroundColor>
-     <BackgroundImage>None</BackgroundImage>
-     <Font>Default</Font>
-    </Appearance>
-    <SliderMode ValueDisplayStyle="Exact" ClickAndGoType="None" Monitor="true">Level</SliderMode>
-    <Level LowLimit="0" HighLimit="255" Value="0">
-     <Channel Fixture="0">0</Channel>
-     <Channel Fixture="0">3</Channel>
-     <Channel Fixture="0">6</Channel>
-     <Channel Fixture="0">9</Channel>
-     <Channel Fixture="0">12</Channel>
-     <Channel Fixture="0">15</Channel>
-     <Channel Fixture="0">18</Channel>
-     <Channel Fixture="0">21</Channel>
-     <Channel Fixture="0">24</Channel>
-     <Channel Fixture="0">27</Channel>
-    </Level>
-    <Playback>
-     <Function>4294967295</Function>
-    </Playback>
-   </Slider>
-   <Slider Caption="Fixture Master" ID="10" WidgetStyle="Slider" InvertedAppearance="false">
-    <WindowState Visible="True" X="230" Y="215" Width="110" Height="200"/>
-    <Appearance>
-     <FrameStyle>Sunken</FrameStyle>
-     <ForegroundColor>Default</ForegroundColor>
-     <BackgroundColor>Default</BackgroundColor>
-     <BackgroundImage>None</BackgroundImage>
-     <Font>Default</Font>
-    </Appearance>
-    <SliderMode ValueDisplayStyle="Exact" ClickAndGoType="None" Monitor="false">Level</SliderMode>
-    <Level LowLimit="0" HighLimit="255" Value="0">
-     <Channel Fixture="0">0</Channel>
-     <Channel Fixture="0">1</Channel>
-     <Channel Fixture="0">2</Channel>
-     <Channel Fixture="0">3</Channel>
-     <Channel Fixture="0">4</Channel>
-     <Channel Fixture="0">5</Channel>
-     <Channel Fixture="0">6</Channel>
-     <Channel Fixture="0">7</Channel>
-     <Channel Fixture="0">8</Channel>
-     <Channel Fixture="0">9</Channel>
-     <Channel Fixture="0">10</Channel>
-     <Channel Fixture="0">11</Channel>
-     <Channel Fixture="0">12</Channel>
-     <Channel Fixture="0">13</Channel>
-     <Channel Fixture="0">14</Channel>
-     <Channel Fixture="0">15</Channel>
-     <Channel Fixture="0">16</Channel>
-     <Channel Fixture="0">17</Channel>
-     <Channel Fixture="0">18</Channel>
-     <Channel Fixture="0">19</Channel>
-     <Channel Fixture="0">20</Channel>
-     <Channel Fixture="0">21</Channel>
-     <Channel Fixture="0">22</Channel>
-     <Channel Fixture="0">23</Channel>
-     <Channel Fixture="0">24</Channel>
-     <Channel Fixture="0">25</Channel>
-     <Channel Fixture="0">26</Channel>
-     <Channel Fixture="0">27</Channel>
-     <Channel Fixture="0">28</Channel>
-     <Channel Fixture="0">29</Channel>
-    </Level>
-    <Playback>
-     <Function>4294967295</Function>
-    </Playback>
-   </Slider>
    <Slider Caption="Pixel1 green" ID="11" WidgetStyle="Slider" InvertedAppearance="false">
-    <WindowState Visible="True" X="395" Y="215" Width="80" Height="195"/>
+    <WindowState Visible="True" X="100" Y="0" Width="75" Height="345"/>
     <Appearance>
      <FrameStyle>Sunken</FrameStyle>
      <ForegroundColor>Default</ForegroundColor>
@@ -269,7 +207,7 @@
     </Playback>
    </Slider>
    <AudioTriggers BarsNumber="5" Caption="" ID="12">
-    <WindowState Visible="True" X="645" Y="95" Width="345" Height="290"/>
+    <WindowState Visible="True" X="180" Y="0" Width="215" Height="390"/>
     <Appearance>
      <FrameStyle>Sunken</FrameStyle>
      <ForegroundColor>Default</ForegroundColor>
@@ -281,9 +219,22 @@
      <DMXChannels>0,1</DMXChannels>
     </VolumeBar>
    </AudioTriggers>
+   <Button Caption="single channel" ID="13" Icon="">
+    <WindowState Visible="True" X="100" Y="350" Width="75" Height="40"/>
+    <Appearance>
+     <FrameStyle>None</FrameStyle>
+     <ForegroundColor>Default</ForegroundColor>
+     <BackgroundColor>Default</BackgroundColor>
+     <BackgroundImage>None</BackgroundImage>
+     <Font>Default</Font>
+    </Appearance>
+    <Function ID="4"/>
+    <Action>Flash</Action>
+    <Intensity Adjust="False">100</Intensity>
+   </Button>
   </Frame>
   <Properties>
-   <Size Width="1920" Height="1080"/>
+   <Size Width="400" Height="400"/>
    <GrandMaster ChannelMode="Intensity" ValueMode="Reduce" SliderMode="Normal"/>
   </Properties>
  </VirtualConsole>
