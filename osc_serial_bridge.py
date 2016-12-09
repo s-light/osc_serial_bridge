@@ -81,6 +81,7 @@ class SerialHandler(threading.Thread):
     """Wrapper for SerialPort."""
 
     def __init__(self, device, rx_queue, tx_queue):
+        """Init Serial Handler."""
         super(SerialHandler, self).__init__()
 
         self._shutdown = threading.Event()
@@ -92,19 +93,25 @@ class SerialHandler(threading.Thread):
         self.tx_queue = tx_queue
 
         # https://pythonhosted.org/pyserial/shortintro.html#eol
-        ser = serial.serial_for_url(
+        self.ser = serial.serial_for_url(
             self.device,
             baudrate=self.baudrate,
             timeout=0,
             do_not_open=True
         )
-        sio = io.TextIOWrapper(io.BufferedRWPair(ser, ser))
-
-        self.ser = ser
-        self.sio = sio
+        self.sio = io.TextIOWrapper(
+            io.BufferedRWPair(self.ser, self.ser)
+        )
+        # http://stackoverflow.com/a/16961872/574981
+        # self.sio = io.TextIOWrapper(
+        #     io.BufferedRWPair(self.ser, self.ser, 1),
+        #     newline='\n',
+        #     line_buffering=True
+        # )
 
     def open(self):
         """Open the Serial port."""
+        # print("open():")
         if not self.ser.is_open:
             try:
                 self.ser.open()
@@ -119,7 +126,9 @@ class SerialHandler(threading.Thread):
                 print(error_message)
                 # if thread is running stop it.
                 self._shutdown.set()
-        # print(" is_open:", ser.is_open)
+            else:
+                print("opened serial device '{}'".format(self.device))
+        # print(" is_open:", self.ser.is_open)
 
     def close(self):
         """Close the Serial port."""
@@ -128,7 +137,7 @@ class SerialHandler(threading.Thread):
             self.ser.close()
 
     def read_nonblocking(self):
-        """Read and put in queue."""
+        """Read serial message and put in queue."""
         # last_line = None
         line = None
         if self.ser.is_open:
@@ -137,6 +146,7 @@ class SerialHandler(threading.Thread):
             try:
                 # lines = sio.readlines()
                 line = sio.readline()
+                # line = ser.readline()
             except serial.serialutil.SerialException as e:
                 error_message = (
                     "readlines failed at port {}: {}"
@@ -148,27 +158,36 @@ class SerialHandler(threading.Thread):
                 print(error_message)
                 self.close()
                 self._shutdown.set()
-            # else:
-            #     # print(lines)
-            #     if len(lines) > 0:
-            #         last_line = lines[len(lines)-1]
-            #         # print(last_line)
+            else:
+                # if line:
+                #     print("line: '{}'".format(line))
+                # if len(lines) > 0:
+                #     print(lines)
+                #     line = lines[len(lines)-1]
+                #     print(line)
+                pass
         # return last_line
         return line
 
     def send(self, message):
+        """Send serial message."""
         if self.ser.is_open:
             sio.write(unicode(message))
             # this it is buffering. required to get the data out *now*
             sio.flush()
 
     def run(self):
-        while not self._shutdown.is_set:
+        """handle incomming and outgoing serial treffic."""
+        while not self._shutdown.is_set():
             if self.ser.is_open:
                 # check for new content
                 line = self.read_nonblocking()
                 if line:
+                    # print("line: '{}'".format(line))
                     self.rx_queue.put(line)
+                    # print("rx_queue.qsize: '{}'".format(
+                    #     self.rx_queue.qsize()
+                    # ))
 
                 # check if there is data to send.
                 try:
@@ -181,10 +200,12 @@ class SerialHandler(threading.Thread):
             else:
                 # try to open
                 self.open()
-
+        # loop has exited.
+        # make sure we close the port on exit..
         self.close()
 
     def shutdown(self):
+        """Shutdown Serial Port."""
         self._shutdown.set()
 
 
@@ -192,6 +213,7 @@ class Serial2OSC(threading.Thread):
     """threaded serial to osc conversion"""
 
     def __init__(self, target_ip, target_port, rx_queue):
+        """Init."""
         super(Serial2OSC, self).__init__()
 
         self._shutdown = threading.Event()
@@ -205,12 +227,17 @@ class Serial2OSC(threading.Thread):
             self.target_port
         )
 
-    def handle_serial_message(message):
-        print(message)
+    def handle_serial_message(self, message):
+        """Process an incomming serial message."""
+        # print(message)
+        print("message: '{}'".format(message))
+        # if message.startswith("f"):
+        #     pass
         # self.osc_client.send_message("/filter", random.random())
 
     def run(self):
-        while not self._shutdown.is_set:
+        """Run - waits for incomming serial messages."""
+        while not self._shutdown.is_set():
             # check if there is data to send.
             try:
                 message = self.rx_queue.get_nowait()
@@ -221,6 +248,7 @@ class Serial2OSC(threading.Thread):
                 self.handle_serial_message(message)
 
     def shutdown(self):
+        """Shutdown Serial handling."""
         self._shutdown.set()
 
 
@@ -228,6 +256,7 @@ class OSC2Serial(threading.Thread):
     """threaded osc to serial conversion"""
 
     def __init__(self, listen_ip, listen_port, tx_queue):
+        """Init Class."""
         super(OSC2Serial, self).__init__()
 
         self._shutdown = threading.Event()
@@ -244,8 +273,7 @@ class OSC2Serial(threading.Thread):
 
         self.dispatcher = dispatcher.Dispatcher()
 
-        # /QLC+ universe - 1/dmx/DMX channel - 1
-        self.dispatcher.map("/6/dmx", self.handle_osc_message)
+        self.setup_dispatcher()
 
         # self.osc_server = osc_server.ForkingOSCUDPServer(
         self.osc_server = osc_server.ThreadingOSCUDPServer(
@@ -253,16 +281,24 @@ class OSC2Serial(threading.Thread):
             self.dispatcher
         )
 
-    def handle_osc_message(self, message):
-        # check for new content
+    def setup_dispatcher(self):
+        """setup osc listening addresses."""
+        # /QLC+ universe - 1/dmx/DMX channel - 1
+        self.dispatcher.map("/0/dmx/*", self.handle_osc_message)
 
-        if line:
-            self.tx_queue.put(line)
+    def handle_osc_message(self, osc_addr, osc_message):
+        """Handle osc messages."""
+        # check for new content
+        if osc_message:
+            print("{}: {}".format(osc_addr, osc_message))
+            # self.tx_queue.put(serial_message)
 
     def run(self):
+        """Run osc server."""
         self.osc_server.serve_forever()
 
     def shutdown(self):
+        """Shutdown osc server."""
         # active_children is possible by ForkingOSCUDPServer
         # if self.osc_server.active_children:
         #     print("osc_server.shutdown()")
@@ -296,10 +332,10 @@ if __name__ == '__main__':
     # commandline arguments
     # filename_default = "./pattern.json"
     osc_target_ip_default = "127.0.0.1"
-    # osc_target_port_default = 7700
-    osc_target_port_default = 7706
-    # osc_listen_port_default = 9000
-    osc_listen_port_default = 9006
+    osc_target_port_default = 7700
+    # osc_target_port_default = 7706
+    osc_listen_port_default = 9000
+    # osc_listen_port_default = 9006
 
     serial_device_default = "/dev/ttyACM0"
 
