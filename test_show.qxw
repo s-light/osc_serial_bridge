@@ -9,6 +9,7 @@
  <Engine>
   <InputOutputMap>
    <Universe Name="Universe 1" ID="0">
+    <Input Plugin="OSC" Line="0" Profile="s-light 6chDesk"/>
     <Output Plugin="OSC" Line="0"/>
    </Universe>
   </InputOutputMap>
@@ -65,12 +66,12 @@
    <MonoColor>4294901760</MonoColor>
    <EndColor>4283825920</EndColor>
    <FixtureGroup>0</FixtureGroup>
-   <Property Name="presetSize" Value="10"/>
+   <Property Name="tailfade" Value="Yes"/>
    <Property Name="orientation" Value=""/>
    <Property Name="direction" Value=""/>
    <Property Name="taillength" Value="50"/>
+   <Property Name="presetSize" Value="10"/>
    <Property Name="presetIndex" Value=""/>
-   <Property Name="tailfade" Value="Yes"/>
   </Function>
   <Function ID="4" Type="Scene" Name="single channel">
    <Speed FadeIn="0" FadeOut="0" Duration="0"/>
@@ -79,7 +80,7 @@
   <Monitor DisplayMode="0" ShowLabels="0">
    <Font>Arial,12,-1,5,50,0,0,0,0,0</Font>
    <ChannelStyle>0</ChannelStyle>
-   <ValueStyle>0</ValueStyle>
+   <ValueStyle>1</ValueStyle>
    <Grid Width="5" Height="5" Units="0"/>
   </Monitor>
  </Engine>
@@ -116,8 +117,9 @@
       <BackgroundImage>None</BackgroundImage>
       <Font>Default</Font>
      </Appearance>
+     <Input Universe="0" Channel="29510"/>
      <SliderMode ValueDisplayStyle="Exact" ClickAndGoType="None">Submaster</SliderMode>
-     <Level LowLimit="0" HighLimit="255" Value="0"/>
+     <Level LowLimit="0" HighLimit="255" Value="6"/>
      <Playback>
       <Function>4294967295</Function>
      </Playback>
@@ -206,19 +208,6 @@
      <Function>4294967295</Function>
     </Playback>
    </Slider>
-   <AudioTriggers BarsNumber="5" Caption="" ID="12">
-    <WindowState Visible="True" X="180" Y="0" Width="215" Height="390"/>
-    <Appearance>
-     <FrameStyle>Sunken</FrameStyle>
-     <ForegroundColor>Default</ForegroundColor>
-     <BackgroundColor>Default</BackgroundColor>
-     <BackgroundImage>None</BackgroundImage>
-     <Font>Default</Font>
-    </Appearance>
-    <VolumeBar Name="Volume Bar" Type="1" MinThreshold="51" MaxThreshold="204" Divisor="1" Index="1000">
-     <DMXChannels>0,1</DMXChannels>
-    </VolumeBar>
-   </AudioTriggers>
    <Button Caption="single channel" ID="13" Icon="">
     <WindowState Visible="True" X="100" Y="350" Width="75" Height="40"/>
     <Appearance>
@@ -232,6 +221,38 @@
     <Action>Flash</Action>
     <Intensity Adjust="False">100</Intensity>
    </Button>
+   <Slider Caption="Slider 0" ID="0" WidgetStyle="Slider" InvertedAppearance="false">
+    <WindowState Visible="True" X="175" Y="0" Width="60" Height="200"/>
+    <Appearance>
+     <FrameStyle>Sunken</FrameStyle>
+     <ForegroundColor>Default</ForegroundColor>
+     <BackgroundColor>Default</BackgroundColor>
+     <BackgroundImage>None</BackgroundImage>
+     <Font>Default</Font>
+    </Appearance>
+    <Input Universe="0" Channel="9451"/>
+    <SliderMode ValueDisplayStyle="Exact" ClickAndGoType="None">Playback</SliderMode>
+    <Level LowLimit="0" HighLimit="255" Value="0"/>
+    <Playback>
+     <Function>4294967295</Function>
+    </Playback>
+   </Slider>
+   <Slider Caption="Slider 0" ID="3" WidgetStyle="Slider" InvertedAppearance="false">
+    <WindowState Visible="True" X="240" Y="0" Width="60" Height="200"/>
+    <Appearance>
+     <FrameStyle>Sunken</FrameStyle>
+     <ForegroundColor>Default</ForegroundColor>
+     <BackgroundColor>Default</BackgroundColor>
+     <BackgroundImage>None</BackgroundImage>
+     <Font>Default</Font>
+    </Appearance>
+    <Input Universe="0" Channel="13666"/>
+    <SliderMode ValueDisplayStyle="Exact" ClickAndGoType="None">Playback</SliderMode>
+    <Level LowLimit="0" HighLimit="255" Value="0"/>
+    <Playback>
+     <Function>4294967295</Function>
+    </Playback>
+   </Slider>
   </Frame>
   <Properties>
    <Size Width="400" Height="400"/>

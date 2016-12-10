@@ -60,6 +60,7 @@ version = """04.12.2016 22:53 stefan"""
 # functions
 
 def helper_join(instance):
+    """Join an instance and print message."""
     try:
         instance.join()
     except RuntimeError as e:
@@ -93,10 +94,11 @@ class SerialHandler(threading.Thread):
         self.tx_queue = tx_queue
 
         # https://pythonhosted.org/pyserial/shortintro.html#eol
+        # use timeout so we don't load the cpu to mutch..
         self.ser = serial.serial_for_url(
             self.device,
             baudrate=self.baudrate,
-            timeout=0,
+            timeout=0.1,
             do_not_open=True
         )
         self.sio = io.TextIOWrapper(
@@ -108,6 +110,8 @@ class SerialHandler(threading.Thread):
         #     newline='\n',
         #     line_buffering=True
         # )
+
+        self.buffer = ""
 
     def open(self):
         """Open the Serial port."""
@@ -136,7 +140,7 @@ class SerialHandler(threading.Thread):
             print("close port:")
             self.ser.close()
 
-    def read_nonblocking(self):
+    def read_line_nonblocking(self):
         """Read serial message and put in queue."""
         # last_line = None
         line = None
@@ -145,7 +149,8 @@ class SerialHandler(threading.Thread):
             sio = self.sio
             try:
                 # lines = sio.readlines()
-                line = sio.readline()
+                # part = None
+                part = sio.readline()
                 # line = ser.readline()
             except serial.serialutil.SerialException as e:
                 error_message = (
@@ -165,8 +170,15 @@ class SerialHandler(threading.Thread):
                 #     print(lines)
                 #     line = lines[len(lines)-1]
                 #     print(line)
-                pass
-        # return last_line
+                if part:
+                    self.buffer += part
+                    if self.buffer.endswith('\n'):
+                        # line is fully there.
+                        # copy to line
+                        line = self.buffer
+                        # clear buffer
+                        self.buffer = ""
+                        # print("line: '{}'".format(line))
         return line
 
     def send(self, message):
@@ -178,11 +190,14 @@ class SerialHandler(threading.Thread):
             self.sio.flush()
 
     def run(self):
-        """handle incomming and outgoing serial treffic."""
+        """Handle incomming and outgoing serial treffic."""
         while not self._shutdown.is_set():
+            # sleep for 0.0001s = 0.1ms
+            # time.sleep(0.0001)
+            # time.sleep(0.1)
             if self.ser.is_open:
                 # check for new content
-                line = self.read_nonblocking()
+                line = self.read_line_nonblocking()
                 if line:
                     # print("line: '{}'".format(line))
                     self.rx_queue.put(line)
@@ -198,6 +213,7 @@ class SerialHandler(threading.Thread):
                     pass
                 else:
                     self.send(message)
+                pass
             else:
                 # try to open
                 self.open()
@@ -211,7 +227,7 @@ class SerialHandler(threading.Thread):
 
 
 class Serial2OSC(threading.Thread):
-    """threaded serial to osc conversion"""
+    """Threaded serial to osc conversion."""
 
     def __init__(self, target_ip, target_port, rx_queue):
         """Init."""
@@ -231,17 +247,46 @@ class Serial2OSC(threading.Thread):
     def handle_serial_message(self, message):
         """Process an incomming serial message."""
         # print(message)
-        print("message: '{}'".format(message))
-        # if message.startswith("f"):
-        #     pass
-        # self.osc_client.send_message("/filter", random.random())
+        # print("message: '{}'".format(message))
+        if message.startswith("/fader/"):
+            address, sep, value = message.rpartition(':')
+            value = int(value)
+            if value > 15:
+                # convert value range:
+                # from 0..800
+                # to 0..1
+                # max check
+                if value > 650:
+                    value = 650
+                value = value/650
+                # print(
+                #     "address: {}; "
+                #     "value: {};"
+                #     "".format(
+                #         address,
+                #         value
+                #     )
+                # )
+                self.osc_client.send_message(
+                    address,
+                    value
+                )
+                # self.osc_client.send_message(
+                #     "/fader/",
+                #     random.random()
+                # )
 
     def run(self):
         """Run - waits for incomming serial messages."""
         while not self._shutdown.is_set():
             # check if there is data to send.
             try:
-                message = self.rx_queue.get_nowait()
+                # just sleep 0.001s = 1ms to get processor use down.
+                # time.sleep(0.001)
+                # better use a timeout - thats ative waiting!
+                # timeout after 0.1s = 100ms
+                message = self.rx_queue.get(block=True, timeout=0.1)
+                # message = self.rx_queue.get_nowait()
             except queue.Empty:
                 # thats fine :-)
                 pass
@@ -254,7 +299,7 @@ class Serial2OSC(threading.Thread):
 
 
 class OSC2Serial(threading.Thread):
-    """threaded osc to serial conversion"""
+    """Threaded osc to serial conversion."""
 
     def __init__(self, listen_ip, listen_port, tx_queue):
         """Init Class."""
@@ -284,7 +329,7 @@ class OSC2Serial(threading.Thread):
         )
 
     def setup_dispatcher(self):
-        """setup osc listening addresses."""
+        """Setup osc listening addresses."""
         # /QLC+ universe - 1/dmx/DMX channel - 1
         self.dispatcher.map("/0/dmx/*", self.handle_osc_message)
 
@@ -309,7 +354,10 @@ class OSC2Serial(threading.Thread):
 
             # self.data[channel_id] = channel_value
 
-            serial_message = "dmx/{:d}:{:d}\n".format(channel_id, channel_value)
+            serial_message = "dmx/{:d}:{:d}\n".format(
+                channel_id,
+                channel_value
+            )
             # print(serial_message)
             self.tx_queue.put(
                 serial_message

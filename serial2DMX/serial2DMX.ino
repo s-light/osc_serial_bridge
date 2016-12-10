@@ -144,23 +144,40 @@ uint16_t DMX_channel_start = 0;
 
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-//
+// analog 2 digital mapping
 
-// const uint8_t cbFaderCount = 6;
-//
-// // Pin for Analog In reading
-// const uint8_t pin_Fader[cbFaderCount]	= {A0, A1, A2, A3, A4, A5};
-// const uint8_t pin_VCC					= A6; // DigitalPin 4
-//
-// // Raw Values
-// uint16_t wValue_Fader[cbFaderCount] = {0, 0, 0, 0, 0, 0};
-// uint16_t wValue_VCC = 0;
-//
-// // Map
-// const uint8_t bMap_Count			= 4;
-// uint16_t wMap_InFader [bMap_Count]	= {    0,   40, 1020, 1023};
-// uint16_t wMap_OutDMX  [bMap_Count]	= {    0,   10,  255,  255};
+const uint8_t fader_count = 6;
 
+// Pin for Analog In reading
+const uint8_t fader_pins[fader_count]  = {A0, A1, A2, A3, A4, A5};
+const uint8_t voltage_pin              = A6; // DigitalPin 4
+
+// Raw Values
+uint16_t fader_value_raw[fader_count] = {0, 0, 0, 0, 0, 0};
+// uint8_t  fader_value_mapped[fader_count] = {0, 0, 0, 0, 0, 0};
+uint16_t fader_voltage_value = 0;
+
+// Map
+const uint8_t map_count      = 4;
+uint16_t map_InFader [map_count]  = {    0,   40, 1010, 1023};
+uint16_t map_OutDMX  [map_count]  = {    0,   10,  255,  255};
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// dataout: output fader values over serial
+
+uint32_t dataout_timestamp_lastsend = 0;
+uint16_t dataout_refresh_interval = 5000;
+
+uint16_t dataout_values[fader_count] = {0, 0, 0, 0, 0, 0};
+// uint8_t dataout_values[fader_count] = {0, 0, 0, 0, 0, 0};
+
+const uint8_t dataout_filter_count = 20;
+uint8_t dataout_filter_index = 0;
+uint16_t dataout_filter[fader_count][dataout_filter_count];
+
+bool dataout_enabled = true;
+
+bool debugOut_Dataout_Serial_Enabled = false;
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // other things..
@@ -338,9 +355,12 @@ void handleMenu_Main(slight_DebugMenu *pInstance) {
             out.println(F("\t 'i': sketch info"));
             out.println(F("\t 'y': toggle DebugOut livesign print"));
             out.println(F("\t 'Y': toggle DebugOut livesign LED"));
+            out.println(F("\t 'X': toggle debug dataout print"));
             out.println(F("\t 'x': tests"));
             out.println();
-            out.println(F("\t 'A': Show 'HelloWorld' "));
+            out.println(F("\t 'p': print current fader values. "));
+            out.println(F("\t 's': send current fader values. "));
+            out.println(F("\t 'S': toggle send dataout. "));
             out.println(F("\t 'f': DemoFadeTo(ID, value) 'f1:65535'"));
             out.println(F("\t 'd': dmx channels 'dmx/512:255'"));
             out.println(F("\t 'D': Dmx channels B=byte 'DmxSS/[BBB...]'"));
@@ -361,6 +381,12 @@ void handleMenu_Main(slight_DebugMenu *pInstance) {
             debugOut_LiveSign_LED_Enabled = !debugOut_LiveSign_LED_Enabled;
             out.print(F("\t debugOut_LiveSign_LED_Enabled:"));
             out.println(debugOut_LiveSign_LED_Enabled);
+        } break;
+        case 'X': {
+            out.println(F("\t toggle Debugout dataout:"));
+            debugOut_Dataout_Serial_Enabled = !debugOut_Dataout_Serial_Enabled;
+            out.print(F("\t debugOut_Dataout_Serial_Enabled:"));
+            out.println(debugOut_Dataout_Serial_Enabled);
         } break;
         case 'x': {
             // get state
@@ -388,8 +414,50 @@ void handleMenu_Main(slight_DebugMenu *pInstance) {
             out.println(F("__________"));
         } break;
         //---------------------------------------------------------------------
-        case 'A': {
-            out.println(F("\t Hello World! :-)"));
+        case 'p': {
+            out.println(F("\t Current Values:"));
+
+            // temporary deactivate dataout_enabled
+            // save current data out state:
+            bool temp = dataout_enabled;
+            dataout_enabled = false;
+            // update calculations
+            dataout_update();
+            // restore enable state
+            dataout_enabled = temp;
+
+            out.print("fv:");
+            // slight_DebugMenu::print_uint8_array(
+            //     out,
+            //     dataout_values,
+            //     fader_count
+            // );
+            slight_DebugMenu::print_uint16_array(
+                out,
+                dataout_values,
+                fader_count
+            );
+
+            // endline
+            out.println();
+        } break;
+        case 's': {
+            // temporary deactivate dataout_enabled
+            // save current data out state:
+            bool temp = dataout_enabled;
+            dataout_enabled = false;
+            // update calculations
+            dataout_update();
+            // restore enable state
+            dataout_enabled = temp;
+
+            dataout_print(out);
+        } break;
+        case 'S': {
+            out.println(F("\t toggle dataout:"));
+            dataout_enabled = !dataout_enabled;
+            out.print(F("\t dataout_enabled:"));
+            out.println(dataout_enabled);
         } break;
         case 'f': {
             out.print(F("\t DemoFadeTo "));
@@ -429,6 +497,252 @@ void handleMenu_Main(slight_DebugMenu *pInstance) {
 
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// faders
+
+void readAnalogFader() {
+    //unsigned long ulTimeStamp = millis();
+
+      // Read VCC; -13=correction: difference between VCC and max Fader Voltage.
+      fader_voltage_value = analogRead(voltage_pin) - 13 ;
+      // read fader
+      // uint16_t analog_in_raw = 0;
+      for (uint8_t fader_index = 0; fader_index < fader_count ; fader_index++) {
+        uint16_t analog_in_raw = analogRead(fader_pins[fader_index]);
+        // no remapping.
+        fader_value_raw[fader_index] = analog_in_raw;
+        // remap to accomendate for input-voltage range.
+        // unsigned long lTemp = (unsigned long)analog_in_raw * 1024;
+        // fader_value_raw[fader_index] = (uint16_t) (lTemp / fader_voltage_value);
+      }
+
+    //unsigned long ulTimeStamp2 = millis();
+    // Serial.print("analog_in_raw: ");
+    // Serial.print(analog_in_raw);
+
+    // Serial.print("VCC: ");
+    // Serial.print(fader_voltage_value);
+
+    // Serial.print(", ");
+    // Serial.print( (fader_voltage_value*50) / 1024 );
+    // Serial.print("V ");
+
+    // Serial.print(" ms:");
+    // Serial.println(ulTimeStamp2 - ulTimeStamp);
+
+    // DEBUG AUSGABE
+    // Serial.print("; Fader: ");
+    // for (uint8_t fader_index = 0; fader_index < fader_count ; fader_index++) {
+    //
+    //   Serial.print(fader_value_raw[fader_index]);
+    //   Serial.print(", ");
+    // }
+    // Serial.println();
+
+      //Serial.print("A0: ");
+      //Serial.println(analogRead(A0));
+
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// dataout
+
+uint8_t dataout_map_value(uint16_t value_raw) {
+    uint8_t value =  multiMap(
+        value_raw,
+        map_InFader,
+        map_OutDMX,
+        map_count
+    );
+    return value;
+}
+
+
+uint16_t dataout_filter_channel(uint8_t fader_id, uint16_t value_new) {
+   uint16_t value_result = 0;
+   // median filter
+   // based on
+   // http://www.elcojacobs.com/eleminating-noise-from-sensor-readings-on-arduino-with-digital-filtering/
+   // mode = median + averag
+   // median
+   // int sortedValues[NUM_READS];
+   // for(int i=0;i<NUM_READS;i++){
+   //   int value = analogRead(sensorpin);
+   //   int j;
+   //   if(value<sortedValues[0] || i==0){
+   //      j=0; //insert at first position
+   //   }
+   //   else{
+   //     for(j=1;j<i;j++){
+   //        if(sortedValues[j-1]<=value && sortedValues[j]>=value){
+   //          // j is insert position
+   //          break;
+   //        }
+   //     }
+   //   }
+   //   for(int k=i;k>j;k--){
+   //     // move all values higher than current reading up one position
+   //     sortedValues[k]=sortedValues[k-1];
+   //   }
+   //   sortedValues[j]=value; //insert current reading
+   // }
+   // averag
+   //return scaled mode of 10 values
+   // float returnval = 0;
+   // for(int i=NUM_READS/2-5;i<(NUM_READS/2+5);i++){
+   //   returnval +=sortedValues[i];
+   // }
+   // returnval = returnval/10;
+   // ##########################
+   // 480,  477,  476,  476,  476,  475,  476,  475,  475,  478,  475,  477,  480,  475,  476,  476,  474,  478,  473,  475,  472,  478,  472,  470,  476,  475,  479,  476,  476,  473,  474,  475,  473,  476,  477,  474,  472,  474,  477,  474,  476,  477,  478,  473,  472,  475,  476,  475,  474,    0
+
+
+
+   // median
+   uint8_t insert_pos = 0;
+   if ( (value_new < dataout_filter[fader_id][0]) || (dataout_filter_index > 0) ) {
+      insert_pos = 0;
+   } else {
+      while (
+         !((dataout_filter[fader_id][insert_pos-1] <= value_new) &&
+         (dataout_filter[fader_id][insert_pos] >= value_new))
+      ) {
+         /* code */
+      }
+
+
+      for (insert_pos = 1; insert_pos < dataout_filter_index; insert_pos++) {
+         if (
+            (dataout_filter[fader_id][insert_pos-1] <= value_new) &&
+            (dataout_filter[fader_id][insert_pos] >= value_new)
+         ) {
+            // insert_pos is the correct position.
+            break;
+         }
+      }
+   }
+   // move all values higher than current insert position up one position.
+   for (size_t k = dataout_filter_index; k > insert_pos; k--) {
+      dataout_filter[fader_id][k] = dataout_filter[fader_id][k-1];
+   }
+   // set new value
+   dataout_filter[fader_id][insert_pos] = value_new;
+
+   // increase index
+   dataout_filter_index = dataout_filter_index +1;
+   // wrap around
+   // dataout_filter_index = dataout_filter_index % dataout_filter_count;
+   if (dataout_filter_index >= dataout_filter_count) {
+      dataout_filter_index = 0;
+   }
+
+
+   // averag
+   // get center area
+   uint16_t value_sum = 0;
+   // uint8_t filter_count_one_third = dataout_filter_count/3;
+   uint8_t filter_count_one_fifth = dataout_filter_count/5;
+   for (
+      // size_t i = filter_count_one_third;
+      // i < (filter_count_one_third*2);
+      size_t i = (filter_count_one_fifth*2);
+      i < (filter_count_one_fifth*3);
+      i++
+   ) {
+      value_sum += dataout_filter[fader_id][i];
+   }
+   // value_result = value_sum / filter_count_one_third;
+   value_result = value_sum / filter_count_one_fifth;
+
+   return value_result;
+}
+
+bool dataout_update() {
+    bool flag_changed = false;
+
+    for (size_t fader_index = 0; fader_index < fader_count; fader_index++) {
+        // raw values (10bit)
+        // size_t value = fader_value_raw[fader_index];
+        // mapped values (8bit)
+        // Serial.print(i);
+        // Serial.print(" value new: ");
+        // Serial.print(value);
+        // Serial.println();
+        // Serial.print(i);
+        // Serial.print(" value old: ");
+        // Serial.print(value);
+        // Serial.println();
+
+        size_t value = fader_value_raw[fader_index];
+
+        // size_t value = dataout_map_value(fader_value_raw[fader_index]);
+
+        // size_t value = dataout_filter_channel(
+        //     fader_index,
+        //     fader_value_raw[fader_index]
+        // );
+
+        // value = dataout_map_value(value);
+
+        // value = dataout_filter_channel(i, value);
+
+        if (value != dataout_values[fader_index]) {
+            dataout_values[fader_index] = value;
+            flag_changed = true;
+            if (dataout_enabled) {
+                send_fader_message(
+                    Serial,
+                    fader_index,
+                    value
+                );
+            }
+        }
+    }
+    return flag_changed;
+}
+
+void send_fader_message(Print &out, uint8_t id, uint16_t value) {
+    out.print("/fader/");
+    out.print(id);
+    out.print(":");
+    out.print(value);
+    out.println();
+}
+
+void dataout_print(Print &out) {
+    // out.print("fv:");
+    //
+    // // slight_DebugMenu::print_uint8_array(out, dataout_values , fader_count);
+    // slight_DebugMenu::print_uint16_array(out, dataout_values , fader_count);
+    //
+    // // endline
+    // out.println();
+    for (size_t fader_index = 0; fader_index < fader_count; fader_index++) {
+        send_fader_message(
+            out,
+            fader_index,
+            dataout_values[fader_index]
+        );
+    }
+}
+
+void dataout_handle() {
+    if (dataout_enabled) {
+        if(dataout_update()){
+            dataout_timestamp_lastsend = millis();
+            // will be handled on channel basis inside of dataout_update
+            // dataout_print(Serial);
+        } else {
+            uint32_t duration = millis() - dataout_timestamp_lastsend;
+            if (duration > dataout_refresh_interval) {
+                dataout_timestamp_lastsend = millis();
+                dataout_print(Serial);
+            }
+        }
+    }
+}
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // other things..
 
 
@@ -446,10 +760,6 @@ void setup() {
         digitalWrite(infoled_pin, HIGH);
 
         // as of arduino 1.0.1 you can use INPUT_PULLUP
-
-    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    // init DMX
-    DMX_init(Serial);
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // initialise serial
@@ -483,20 +793,21 @@ void setup() {
         sketchinfo_print(Serial);
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    // setup XXX1
+    // init DMX
 
-        // Serial.print(F("# Free RAM = "));
-        // Serial.println(freeRam());
-        //
-        // Serial.println(F("setup XXX1:")); {
-        //
-        //     Serial.println(F("\t sub action"));
-        // }
-        // Serial.println(F("\t finished."));
+        DMX_init(Serial);
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    // inits
-    init();
+    // setup faders
+
+        Serial.print(F("# Free RAM = "));
+        Serial.println(freeRam());
+
+        Serial.println(F("fader / analog inputs:")); {
+            Serial.println(F("\t nothing to do. defaults to input."));
+        }
+        Serial.println(F("\t finished."));
+
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // show serial commands
@@ -522,6 +833,14 @@ void loop() {
         myDebugMenu.update();
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // analog in
+        readAnalogFader();
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // dataout
+        dataout_handle();
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // timed things
 
         // every XXXXms
@@ -544,6 +863,33 @@ void loop() {
                 Serial.print(F("ms;"));
                 Serial.print(F("  free RAM = "));
                 Serial.println(freeRam());
+            }
+
+            if ( debugOut_Dataout_Serial_Enabled ) {
+                Serial.println(F("fader_value_raw"));
+                slight_DebugMenu::print_uint16_array(
+                   Serial,
+                   fader_value_raw,
+                   fader_count
+                );
+                Serial.println();
+                Serial.println(F("dataout_values"));
+                slight_DebugMenu::print_uint16_array(
+                   Serial,
+                   dataout_values,
+                   fader_count
+                );
+                Serial.println();
+                // Serial.println(F("dataout_filter"));
+                // for (size_t i = 0; i < fader_count; i++) {
+                //    slight_DebugMenu::print_uint16_array(
+                //       Serial,
+                //       dataout_filter[i] ,
+                //       dataout_filter_count
+                //    );
+                //    Serial.println();
+                // }
+                Serial.println();
             }
 
             if ( debugOut_LiveSign_LED_Enabled ) {
